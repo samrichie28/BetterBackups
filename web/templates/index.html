@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BetterBackups Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #terminal::-webkit-scrollbar { width: 8px; }
+        #terminal::-webkit-scrollbar-track { background: #1f2937; }
+        #terminal::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center shadow-md">
+        <h1 class="text-xl font-bold text-cyan-400">BetterBackups Console</h1>
+        <a href="/config" class="text-sm font-bold text-gray-400 hover:text-white transition flex items-center space-x-2">
+            <span>⚙️ Configuration</span>
+        </a>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-1 space-y-4">
+            {% for job in jobs %}
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 shadow-sm flex flex-col justify-between min-h-[200px] transition hover:border-cyan-900">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-medium text-cyan-400">{{ job.name }}</h3>
+                        <span id="status-tag-{{ job.id }}" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded
+                            {% if job.status == 'Success' %}bg-green-900 text-green-300
+                            {% elif job.status == 'Failed' %}bg-red-900 text-red-300
+                            {% elif job.status == 'Stopped' %}bg-yellow-900 text-yellow-300
+                            {% else %}bg-gray-700 text-gray-400{% endif %}">
+                            {{ job.status }}
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-2 space-y-1">
+                        <p>Last: <span id="last-run-{{ job.id }}" class="text-gray-200">{{ job.last_run }}</span></p>
+                        <p>Next: <span class="text-gray-200">{{ job.next_run }}</span></p>
+                    </div>
+                    {% if job.status == 'Failed' or job.status == 'Stopped' %}
+                    <div class="mt-3 p-2 bg-black/40 border border-red-900/30 rounded">
+                        <p class="text-[10px] text-red-400 font-mono truncate" title="{{ job.error }}">{{ job.error or "Interrupted" }}</p>
+                        {% if job.log_link %}<a href="{{ job.log_link }}" target="_blank" class="text-[10px] text-cyan-500 underline mt-1 block">View Full Log</a>{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="flex justify-end mt-4 space-x-2 items-center">
+                    {% if job.type in ['backup_duplication', 'cloud_push', 'cloud_pull'] %}
+                        <select id="action_{{ job.id }}" class="bg-gray-900 text-gray-300 text-xs rounded border border-gray-600 px-2 py-1.5 outline-none focus:border-cyan-500">
+                            <option value="{{ job.id }}">Run Job</option>
+                            <option value="{{ job.id }}_check">Integrity Check</option>
+                        </select>
+                        <button onclick="startJob('{{ job.id }}', document.getElementById('action_{{ job.id }}').value)" id="btn-run-{{ job.id }}" class="bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold py-1 px-3 rounded transition">Run</button>
+                    {% else %}
+                        <button onclick="startJob('{{ job.id }}')" id="btn-run-{{ job.id }}" class="bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold py-1 px-3 rounded transition">Run Now</button>
+                    {% endif %}
+
+                    <button onclick="requestStop('{{ job.id }}')" id="btn-stop-{{ job.id }}" class="hidden bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-semibold py-1 px-3 rounded transition">Stop</button>
+                    <button onclick="forceStop('{{ job.id }}')" id="btn-force-{{ job.id }}" class="hidden bg-red-600 hover:bg-red-500 text-white text-sm font-semibold py-1 px-3 rounded transition">Kill</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="lg:col-span-2 flex flex-col h-[700px] space-y-4">
+            <div class="bg-gray-800 rounded-lg border border-gray-700 p-4 shadow-sm min-h-[140px] flex flex-col">
+                <h3 class="font-medium text-purple-400 mb-3 border-b border-gray-700 pb-1 text-sm uppercase tracking-wider">Task Queue</h3>
+                <div id="queue-list" class="space-y-2 text-sm text-gray-300 overflow-y-auto pr-2">
+                    <div class="text-gray-500 italic">No jobs currently in queue.</div>
+                </div>
+            </div>
+
+            <div class="bg-black rounded-lg border border-gray-700 flex-grow p-4 font-mono text-sm overflow-hidden flex flex-col shadow-inner">
+                <div id="terminal" class="overflow-y-auto flex-grow space-y-1 pr-2">
+                    <div class="text-gray-500 italic">Select a job to begin...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentWs = null, activeJobCardId = null, stopTimer = null;
+        let lastActivityTimestamp = null;
+        
+        // --- SECURITY SANITIZER ---
+        function escapeHTML(str) {
+            if (!str) return "";
+            return String(str).replace(/[&<>'"]/g, function(tag) {
+                const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+                return charsToReplace[tag] || tag;
+            });
+        }
+
+        function getStatusClasses(status) {
+            switch(status) {
+                case 'Processing': return 'bg-cyan-900 text-cyan-300 animate-pulse';
+                case 'Queued': return 'bg-purple-900 text-purple-300';
+                case 'Success': return 'bg-green-900 text-green-300';
+                case 'Failed': return 'bg-red-900 text-red-300';
+                case 'Stopped': return 'bg-yellow-900 text-yellow-300';
+                default: return 'bg-gray-700 text-gray-400';
+            }
+        }
+
+        function renderQueueData(data) {
+            const qList = document.getElementById('queue-list');
+            const queueState = data.queue_state;
+            const statuses = data.statuses;
+            let html = '';
+            
+            if (queueState.current) {
+                let activityText = 'Starting...';
+                let pulseClass = 'bg-gray-600';
+
+                if (lastActivityTimestamp) {
+                    const secondsAgo = Math.floor((Date.now() - lastActivityTimestamp) / 1000);
+                    activityText = `${secondsAgo}s ago`;
+                    pulseClass = secondsAgo > 40 ? 'bg-red-500' : 'bg-green-500 animate-pulse';
+                }
+
+                // SECURITY FIX: Escape dynamic JSON data before injecting into DOM
+                const safeJobId = escapeHTML(queueState.current.job_id);
+                const safeType = escapeHTML(queueState.current.type);
+
+                html += `<div class="flex justify-between items-center bg-gray-900 p-2 rounded border border-purple-500/50 mb-2">
+                    <div class="flex items-center">
+                        <div class="w-2 h-2 rounded-full ${pulseClass} mr-3"></div>
+                        <div>
+                            <div class="uppercase font-bold text-sm">${safeJobId}</div>
+                            <div class="text-[10px] text-gray-500">Active: ${activityText} | Type: ${safeType}</div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-1">
+                        <button onclick="watchJob('${safeJobId}')" class="text-[10px] bg-cyan-600 hover:bg-cyan-500 text-white px-2 py-1 rounded transition">Watch</button>
+                        <button onclick="forceStop('${safeJobId}')" class="text-[10px] bg-red-600/80 hover:bg-red-500 text-white px-2 py-1 rounded transition">Kill</button>
+                    </div>
+                </div>`;
+            }
+            
+            queueState.queue.forEach((q, index) => {
+                const safeJobId = escapeHTML(q.job_id);
+                const safeUuid = escapeHTML(q.uuid);
+                html += `<div class="flex justify-between items-center bg-gray-900/50 p-2 rounded border border-gray-700 mt-1">
+                    <div><span class="text-gray-500 font-bold mr-2">#${index + 1}</span><span class="uppercase text-xs">${safeJobId}</span></div>
+                    <button onclick="removeFromQueue('${safeUuid}')" class="text-[10px] bg-gray-600 hover:bg-red-500 text-white px-2 py-1 rounded transition">Remove</button>
+                </div>`;
+            });
+            
+            if (!queueState.current && queueState.queue.length === 0) {
+                html = '<div class="text-gray-500 italic">No tasks currently running or queued.</div>';
+            }
+            qList.innerHTML = html;
+
+            const allJobCards = document.querySelectorAll('[id^="btn-run-"]');
+            allJobCards.forEach(btn => {
+                const baseId = btn.id.replace('btn-run-', '');
+                const tag = document.getElementById(`status-tag-${baseId}`);
+                const lastRunText = document.getElementById(`last-run-${baseId}`);
+
+                const isRunning = queueState.current && (queueState.current.job_id === baseId || queueState.current.job_id.startsWith(baseId));
+                const isQueued = queueState.queue.some(q => q.job_id === baseId || q.job_id.startsWith(baseId));
+
+                let displayStatus = "";
+                let statusInfo = statuses[baseId] || {status: 'N/A', last_run: 'Never'};
+
+                if (isRunning) {
+                    displayStatus = "Processing";
+                    setUiState(baseId, 'running');
+                } else if (isQueued) {
+                    displayStatus = "Queued";
+                    setUiState(baseId, 'queued');
+                } else {
+                    displayStatus = statusInfo.status;
+                    const stopBtn = document.getElementById(`btn-stop-${baseId}`);
+                    if (stopBtn && !stopBtn.textContent.includes("Stopping")) {
+                        setUiState(baseId, 'idle');
+                    }
+                }
+                
+                if (tag) {
+                    tag.textContent = displayStatus;
+                    tag.className = `text-[10px] uppercase font-bold px-2 py-0.5 rounded ${getStatusClasses(displayStatus)}`;
+                }
+                if (lastRunText && !isRunning && !isQueued) {
+                    lastRunText.textContent = statusInfo.last_run;
+                }
+            });
+        }
+
+        function updateQueue() {
+            fetch('/api/queue').then(r => r.json()).then(data => renderQueueData(data)).catch(err => console.error("Poll error:", err));
+        }
+        
+        setInterval(updateQueue, 2000);
+        updateQueue();
+
+        function removeFromQueue(uuid) {
+            // SECURITY FIX: URL Encode variables
+            fetch(`/api/queue/remove/${encodeURIComponent(uuid)}`, {method: 'POST'}).then(() => updateQueue());
+        }
+
+        function setUiState(jobId, state) {
+            const r = document.getElementById(`btn-run-${jobId}`);
+            const s = document.getElementById(`btn-stop-${jobId}`);
+            const f = document.getElementById(`btn-force-${jobId}`);
+            const drop = document.getElementById(`action_${jobId}`); 
+            
+            if (!r || !s || !f) return;
+
+            if (state === 'idle') { 
+                r.classList.remove('hidden'); r.disabled = false; r.textContent = "Run";
+                s.classList.add('hidden'); f.classList.add('hidden');
+                if (drop) drop.disabled = false;
+            }
+            else if (state === 'running') { 
+                r.classList.add('hidden'); 
+                s.classList.remove('hidden'); s.disabled = false; s.textContent = "Stop";
+                f.classList.add('hidden'); 
+                if (drop) drop.disabled = true;
+            }
+            else if (state === 'queued') {
+                r.classList.remove('hidden'); r.disabled = true; r.textContent = "Queued...";
+                s.classList.add('hidden'); f.classList.add('hidden');
+                if (drop) drop.disabled = true;
+            }
+            else if (state === 'stopping') { 
+                s.disabled = true; s.textContent = "Stopping..."; 
+            }
+            else if (state === 'force_ready') { 
+                s.classList.add('hidden'); f.classList.remove('hidden'); 
+            }
+        }
+
+        function watchJob(jobId) {
+            const t = document.getElementById('terminal');
+            if (currentWs) currentWs.close();
+            
+            // SECURITY FIX: Escape inputs bound for innerHTML
+            const safeJobId = escapeHTML(jobId);
+            t.innerHTML = `<div class="text-cyan-800">>>> ATTACHING TO LIVE STREAM: ${safeJobId.toUpperCase()}...</div>`;
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            // SECURITY FIX: URL Encode variables in WebSockets
+            currentWs = new WebSocket(`${protocol}//${window.location.host}/ws/run/${encodeURIComponent(jobId)}`);
+            
+            currentWs.onmessage = e => { 
+                lastActivityTimestamp = Date.now();
+                t.insertAdjacentHTML('beforeend', e.data); 
+                t.scrollTop = t.scrollHeight; 
+            };
+            
+            currentWs.onclose = () => { 
+                t.insertAdjacentHTML('beforeend', `<div class='text-gray-500 mt-2 italic border-t border-gray-800 pt-2'>Stream disconnected.</div>`); 
+                lastActivityTimestamp = null;
+            };
+        }
+
+        function startJob(baseJobId, executeJobId = null) {
+            const targetJobId = executeJobId || baseJobId;
+            
+            // SECURITY FIX: URL Encode URL variables
+            fetch(`/api/run/${encodeURIComponent(targetJobId)}`, {method: 'POST'})
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) {
+                    alert("⚠️ Task Rejected:\n" + res.message);
+                    return;
+                }
+                
+                fetch('/api/queue')
+                .then(r => r.json())
+                .then(data => {
+                    renderQueueData(data);
+                    const activeJob = data.queue_state.current ? data.queue_state.current.job_id : targetJobId;
+                    if (!currentWs || !currentWs.url.endsWith(`/ws/run/${encodeURIComponent(activeJob)}`)) {
+                        watchJob(activeJob);
+                    }
+                });
+            });
+        }
+
+        function requestStop(baseJobId) { 
+            const dropdown = document.getElementById(`action_${baseJobId}`);
+            const targetId = dropdown ? dropdown.value : baseJobId;
+            setUiState(baseJobId, 'stopping'); 
+            // SECURITY FIX: URL Encode
+            fetch(`/api/stop/${encodeURIComponent(targetId)}`, {method:'POST'}); 
+            stopTimer = setTimeout(() => setUiState(baseJobId, 'force_ready'), 10000); 
+        }
+        
+        function forceStop(baseJobId) { 
+            const dropdown = document.getElementById(`action_${baseJobId}`);
+            const targetId = dropdown ? dropdown.value : baseJobId;
+            // SECURITY FIX: URL Encode
+            fetch(`/api/force_stop/${encodeURIComponent(targetId)}`, {method:'POST'}); 
+            const t = document.getElementById('terminal');
+            t.insertAdjacentHTML('beforeend', `<div class='text-red-600 font-bold mt-4 border-t border-gray-800 pt-2'>--- Process Forcefully Terminated ---</div>`);
+            if (currentWs) currentWs.close();
+            clearTimeout(stopTimer);
+            setTimeout(updateQueue, 1000);
+        }
+    </script>
+</body>
+</html>

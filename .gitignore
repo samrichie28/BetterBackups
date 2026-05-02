@@ -1,0 +1,16 @@
+# Python Virtual Environment
+venv/
+__pycache__/
+*.pyc
+
+# Application Data & Secrets
+config.yaml
+history.json
+rclone.conf
+
+# Downloaded Binaries & Logs
+bin/
+logs/
+install_log.txt
+install_status.txt
+installer_ui.py

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BetterBackups | Authentication</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+        .input-field { @apply w-full bg-gray-900 border border-gray-600 rounded px-4 py-3 text-gray-200 focus:border-cyan-500 outline-none transition mt-1; }
+        .label-text { @apply block text-xs font-bold text-gray-400 uppercase tracking-wide; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans flex items-center justify-center">
+
+    <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-8 w-full max-w-md relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600"></div>
+        
+        <h1 class="text-3xl font-bold text-center text-white mb-2">Better<span class="text-purple-400">Backups</span></h1>
+        <p class="text-center text-gray-400 text-sm mb-8">Please enter your credentials to access the engine.</p>
+
+        <div id="error-message" class="hidden bg-red-900/30 border border-red-800 text-red-400 px-4 py-2 rounded mb-6 text-sm font-bold text-center animate-pulse">
+            Invalid Username or Password
+        </div>
+
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div class="mb-5">
+                <label class="label-text">Username</label>
+                <input type="text" id="username" class="input-field" placeholder="Enter username" required>
+            </div>
+            
+            <div class="mb-8">
+                <label class="label-text">Password</label>
+                <input type="password" id="password" class="input-field" placeholder="Enter password" required>
+            </div>
+            
+            <button type="submit" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded transition shadow-[0_0_15px_rgba(147,51,234,0.3)]">
+                Access Dashboard
+            </button>
+        </form>
+
+        <div class="mt-8 pt-4 border-t border-gray-700 text-center text-[11px] text-gray-500 leading-tight">
+            <strong>LOCKED OUT?</strong><br>
+            Open <code>config.yaml</code> in the BetterBackups folder, change <code>auth_enabled: true</code> to <code>false</code>, and restart the service to regain access.
+        </div>
+    </div>
+
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const btn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('error-message');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Authenticating...';
+            errorDiv.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    btn.className = 'w-full bg-green-600 text-white font-bold py-3 rounded shadow-[0_0_15px_rgba(34,197,94,0.3)] transition';
+                    btn.innerHTML = 'Access Granted ✓';
+                    setTimeout(() => window.location.href = "/", 600);
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Access Dashboard';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = 'Access Dashboard';
+                errorDiv.innerText = "Network Communication Error";
+                errorDiv.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

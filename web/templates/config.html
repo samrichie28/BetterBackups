@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BetterBackups | Settings GUI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+        .input-field { @apply w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 focus:border-cyan-500 outline-none transition; }
+        .label-text { @apply block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1; }
+        .card { @apply bg-gray-800 rounded-lg border border-gray-700 shadow-md mb-6 overflow-hidden transition-all duration-300; }
+        .card-header { @apply px-6 py-4 border-b border-gray-700 bg-gray-900 flex items-center justify-between; }
+        .card-body { @apply p-6 transition-all duration-500 overflow-hidden; }
+        .browse-btn { @apply bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-200 px-3 py-2 rounded transition flex items-center justify-center; }
+        input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        .toggle-checkbox:checked { @apply right-0 border-green-400; right: 0; border-color: #68D391; }
+        .toggle-checkbox:checked + .toggle-label { @apply bg-green-500; background-color: #22c55e; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans pb-12">
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between shadow-md items-center sticky top-0 z-40">
+        <div class="flex items-center space-x-4">
+            <a href="/" class="text-gray-400 hover:text-white transition font-bold text-sm">← Dashboard</a>
+            <h1 class="text-xl font-bold text-purple-400 border-l border-gray-600 pl-4">Engine Configuration</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="save-status" class="text-xs font-bold transition-all duration-300"></span>
+            <button onclick="logout()" class="text-gray-400 hover:text-red-400 text-sm font-bold mr-4 transition" id="logout_btn" style="display:none;">⏏ Logout</button>
+            <button onclick="saveConfig()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-1.5 rounded font-bold transition shadow-lg text-sm">Save Changes</button>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-8">
+        
+        <div class="mb-6 p-4 bg-green-900/20 border border-green-700/30 rounded-lg flex items-start space-x-3">
+            <span class="text-green-500 font-bold">✨ Live Reload Active:</span>
+            <p class="text-sm text-green-200/70">Settings, job definitions, and <strong>cron schedules</strong> are hot-reloaded into the background engine instantly upon saving. No service restarts required!</p>
+        </div>
+
+        <div class="card border-red-900/50">
+            <div class="card-header">
+                <h2 class="text-lg font-bold text-red-400">🔒 Security & Authentication</h2>
+                <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" id="sec_auth_enabled" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="toggleSecurityUI()"/>
+                    <label for="sec_auth_enabled" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-500 cursor-pointer"></label>
+                </div>
+            </div>
+            <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4 transition-all duration-300" id="security_body">
+                <div>
+                    <label class="label-text">Username</label>
+                    <input type="text" id="sec_username" class="input-field" placeholder="admin">
+                </div>
+                <div>
+                    <label class="label-text">Password</label>
+                    <input type="password" id="sec_password" class="input-field" placeholder="••••••••">
+                </div>
+                
+                <div class="col-span-1 md:col-span-2 mt-2">
+                    <label class="label-text text-yellow-500">Trusted Reverse Proxies (Comma separated IPs, e.g., 192.168.0.99)</label>
+                    <input type="text" id="sec_trusted_proxies" class="input-field" placeholder="Leave blank to disable">
+                </div>
+
+                <div class="col-span-1 md:col-span-2 mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-700 pt-4">
+                    <div>
+                        <label class="label-text">Max Login Attempts (Strikes)</label>
+                        <input type="number" id="sec_max_strikes" class="input-field" placeholder="5">
+                    </div>
+                    <div>
+                        <label class="label-text">Lockout Duration (Minutes)</label>
+                        <input type="number" id="sec_lockout_minutes" class="input-field" placeholder="15">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-lg font-bold text-cyan-400">⚙️ App Settings</h2>
+                <div class="flex space-x-2">
+                    <button onclick="restartEngine()" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow">↻ Restart Engine</button>
+                    <button onclick="shutdownEngine()" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow">⏻ Shutdown</button>
+                </div>
+            </div>
+            <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="label-text">Host <span class="text-red-500">*</span></label>
+                    <input type="text" id="app_host" class="input-field req-global">
+                </div>
+                <div>
+                    <label class="label-text">Port <span class="text-red-500">*</span></label>
+                    <input type="number" id="app_port" class="input-field req-global">
+                </div>
+                <div>
+                    <label class="label-text">Log Level <span class="text-red-500">*</span></label>
+                    <select id="app_log_level" class="input-field req-global">
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARNING">WARNING</option>
+                    </select>
+                </div>
+                <div class="mt-4 col-span-1 md:col-span-3">
+                    <label class="label-text text-yellow-500">Log Retention (Days to keep job logs)</label>
+                    <input type="number" id="app_log_retention" class="input-field" placeholder="7">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-lg font-bold text-cyan-400">🛠️ System Executables</h2>
+            </div>
+            <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="label-text">Rclone Config (rclone.conf) <span class="text-red-500">*</span></label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="path_rclone_config" class="input-field req-global">
+                        <button type="button" onclick="openBrowser('path_rclone_config')" class="browse-btn">📁</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="label-text">Rclone Executable (rclone.exe) <span class="text-red-500">*</span></label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="path_rclone_exe" class="input-field req-global">
+                        <button type="button" onclick="openBrowser('path_rclone_exe')" class="browse-btn">📁</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-lg font-bold text-cyan-400">☁️ Cloud Storage Accounts</h2>
+                <button onclick="openAddRemoteModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded font-bold transition shadow-lg text-sm flex items-center">
+                    <span class="mr-2">➕</span> Link Google Drive
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="rclone_remotes_list" class="flex flex-wrap gap-2">
+                    <span class="text-gray-500 italic text-sm">Loading connected accounts...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mt-12 mb-4 border-b border-gray-700 pb-2">
+            <h2 class="text-xl font-bold text-gray-200">🛠️ Active Job Modules</h2>
+            <button onclick="addCustomModule(null, true)" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded font-bold transition shadow-lg text-sm flex items-center">
+                <span class="mr-2">➕</span> Add New Module
+            </button>
+        </div>
+
+        <div id="custom-modules-container" class="space-y-6">
+            </div>
+
+        <div class="card mt-8">
+            <h2 class="card-header text-cyan-400">🔔 Notifications</h2>
+            <div class="p-6">
+                <label class="label-text">Discord Webhook URL</label>
+                <input type="text" id="notif_discord" class="input-field" placeholder="Optional">
+            </div>
+        </div>
+    </main>
+
+    <div id="rclone-modal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-2xl flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-lg">
+                <h3 class="text-blue-400 font-bold text-lg flex items-center"><span class="mr-2">☁️</span> Google Drive Setup</h3>
+                <button onclick="closeRcloneModal()" class="text-gray-400 hover:text-red-500 font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <div id="rclone_input_section">
+                    <div class="mb-4 p-3 bg-blue-900/20 border border-blue-700/30 rounded text-sm text-blue-200">
+                        To prevent Google Rate Limits, it is highly recommended to provide your own Google Cloud API credentials. 
+                        <a href="https://rclone.org/drive/#making-your-own-client-id" target="_blank" class="text-blue-400 underline font-bold">Read the Rclone guide here</a>.
+                    </div>
+                    
+                    <label class="label-text mb-2">Account Name (No spaces, e.g., 'gdrive_personal') <span class="text-red-500">*</span></label>
+                    <input type="text" id="new_remote_name" class="input-field mb-4" placeholder="gdrive_personal">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="label-text mb-2 text-yellow-500">Google Client ID (Optional but Recommended)</label>
+                            <input type="text" id="new_remote_client_id" class="input-field" placeholder="123456789.apps.googleusercontent.com">
+                        </div>
+                        <div>
+                            <label class="label-text mb-2 text-yellow-500">Google Client Secret (Optional but Recommended)</label>
+                            <input type="password" id="new_remote_client_secret" class="input-field" placeholder="GOCSPX-xxxxxx">
+                        </div>
+                    </div>
+                    
+                    <button onclick="startRcloneConfig()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded transition">Start Authentication</button>
+                </div>
+                <div id="rclone_terminal_section" class="hidden">
+                    <div class="bg-black rounded-lg border border-gray-700 p-4 font-mono text-sm overflow-hidden flex flex-col shadow-inner h-64">
+                        <div id="rclone_terminal" class="overflow-y-auto flex-grow space-y-1 pr-2 text-gray-300">
+                        </div>
+                    </div>
+                    <button onclick="closeRcloneModal(); loadRemotes();" class="mt-4 w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded transition">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="browser-modal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-3xl flex flex-col h-[85vh]">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-lg shrink-0">
+                <h3 class="text-cyan-400 font-bold text-lg flex items-center"><span class="mr-2 text-2xl">📁</span> Server Browser</h3>
+                <button onclick="closeBrowser()" class="text-gray-400 hover:text-red-500 font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-3 bg-gray-800 flex space-x-2 border-b border-gray-700 shrink-0">
+                <button onclick="navigateUp()" class="bg-gray-700 hover:bg-cyan-600 border border-gray-600 px-3 py-1.5 rounded text-sm text-gray-200 font-bold transition flex items-center"><span class="mr-1">⬆️</span> Up</button>
+                <input type="text" id="browser-path-input" class="input-field flex-grow font-mono text-sm shadow-inner" placeholder="Server Root (Drives)" onkeydown="if(event.key==='Enter') fetchBrowse(this.value)">
+                <button onclick="fetchBrowse(document.getElementById('browser-path-input').value)" class="bg-cyan-700 hover:bg-cyan-500 px-4 py-1.5 rounded text-sm text-white font-bold transition">Go</button>
+            </div>
+            <div id="browser-list" class="flex-grow overflow-y-auto p-2 space-y-1 bg-gray-950/80"></div>
+            <div class="p-4 border-t border-gray-700 bg-gray-900 rounded-b-lg flex justify-between items-center shrink-0">
+                <div class="text-xs text-gray-500 italic hidden sm:block">Click a folder to open. Click a file to select.</div>
+                <div class="space-x-3 w-full sm:w-auto flex justify-end">
+                    <button onclick="closeBrowser()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm font-bold transition">Cancel</button>
+                    <button onclick="selectCurrentFolder()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded text-sm font-bold transition shadow-[0_0_10px_rgba(22,163,74,0.3)]">Select Current Folder</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- SECURITY LOGIC ---
+        function escapeHTML(str) {
+            if (!str) return "";
+            return String(str).replace(/[&<>'"]/g, function(tag) {
+                const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+                return charsToReplace[tag] || tag;
+            });
+        }
+
+        function toggleSecurityUI() {
+            const isEnabled = document.getElementById('sec_auth_enabled').checked;
+            const body = document.getElementById('security_body');
+            const user = document.getElementById('sec_username');
+            const pass = document.getElementById('sec_password');
+            const proxy = document.getElementById('sec_trusted_proxies');
+            const strikes = document.getElementById('sec_max_strikes');
+            const lockMins = document.getElementById('sec_lockout_minutes');
+            
+            if (isEnabled) {
+                body.style.opacity = "1";
+                user.disabled = false;
+                pass.disabled = false;
+                proxy.disabled = false;
+                strikes.disabled = false;
+                lockMins.disabled = false;
+            } else {
+                body.style.opacity = "0.3";
+                user.disabled = true;
+                pass.disabled = true;
+                proxy.disabled = true;
+                strikes.disabled = true;
+                lockMins.disabled = true;
+            }
+        }
+
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = "/login";
+        }
+
+        // --- SYSTEM CONTROLS ---
+        async function restartEngine() {
+            if (!confirm("Are you sure you want to restart the BetterBackups engine? Any currently running manual jobs will be aborted.")) return;
+            try {
+                const res = await fetch('/api/system/restart', { method: 'POST' });
+                if (res.ok) {
+                    document.body.innerHTML = '<div class="flex items-center justify-center min-h-screen bg-gray-900"><h1 class="text-2xl font-bold text-yellow-500 animate-pulse">Restarting Engine... Please wait.</h1></div>';
+                    setTimeout(() => location.reload(), 5000);
+                }
+            } catch (e) { alert("Network Error: Could not trigger restart."); }
+        }
+
+        async function shutdownEngine() {
+            if (!confirm("Are you sure you want to shut down the BetterBackups engine? The background service will stop entirely and must be manually started again from your server.")) return;
+            try {
+                const res = await fetch('/api/system/shutdown', { method: 'POST' });
+                if (res.ok) {
+                    document.body.innerHTML = '<div class="flex flex-col items-center justify-center min-h-screen bg-gray-900"><h1 class="text-3xl font-bold text-red-500 mb-4">⏻ Engine Shut Down</h1><p class="text-gray-400">The BetterBackups service has been successfully stopped. You may now safely close this tab.</p></div>';
+                }
+            } catch (e) { alert("Network Error: Could not trigger shutdown."); }
+        }
+
+        // --- RCLONE CLOUD ACCOUNT LOGIC ---
+        async function loadRemotes() {
+            try {
+                const res = await fetch('/api/rclone/remotes');
+                const data = await res.json();
+                const container = document.getElementById('rclone_remotes_list');
+                
+                if (data.success && data.remotes.length > 0) {
+                    container.innerHTML = '';
+                    data.remotes.forEach(r => {
+                        container.innerHTML += `<span class="bg-blue-900/50 border border-blue-700 text-blue-300 px-3 py-1 rounded text-sm font-bold shadow-sm flex items-center">☁️ ${escapeHTML(r)} <button onclick="deleteRemote('${escapeHTML(r)}')" class="ml-2 text-red-400 hover:text-red-200" title="Remove Account">✖</button></span>`;
+                    });
+                } else {
+                    container.innerHTML = '<span class="text-gray-500 italic text-sm">No cloud accounts linked yet.</span>';
+                }
+            } catch (e) {
+                document.getElementById('rclone_remotes_list').innerHTML = '<span class="text-red-500 text-sm font-bold">Failed to load accounts. (Ensure Rclone Paths are saved correctly above).</span>';
+            }
+        }
+
+        async function deleteRemote(remoteName) {
+            if (!confirm(`Are you sure you want to permanently remove the cloud account '${remoteName}'?`)) return;
+            try {
+                const res = await fetch(`/api/rclone/remotes/${remoteName}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) { loadRemotes(); } 
+                else { alert("Failed to delete account. Check the configuration."); }
+            } catch (e) { alert("Network error while trying to delete."); }
+        }
+
+        function openAddRemoteModal() {
+            document.getElementById('rclone-modal').classList.remove('hidden');
+            document.getElementById('rclone_input_section').classList.remove('hidden');
+            document.getElementById('rclone_terminal_section').classList.add('hidden');
+            document.getElementById('new_remote_name').value = '';
+            document.getElementById('new_remote_client_id').value = '';
+            document.getElementById('new_remote_client_secret').value = '';
+            document.getElementById('rclone_terminal').innerHTML = '';
+        }
+        
+        function closeRcloneModal() {
+            document.getElementById('rclone-modal').classList.add('hidden');
+            if(rcloneWs) rcloneWs.close();
+        }
+
+        let rcloneWs = null;
+        function startRcloneConfig() {
+            const name = document.getElementById('new_remote_name').value.trim();
+            const client_id = document.getElementById('new_remote_client_id').value.trim();
+            const client_secret = document.getElementById('new_remote_client_secret').value.trim();
+            
+            if (!name) { alert("Please enter an Account Name."); return; }
+            
+            document.getElementById('rclone_input_section').classList.add('hidden');
+            document.getElementById('rclone_terminal_section').classList.remove('hidden');
+            const term = document.getElementById('rclone_terminal');
+            term.innerHTML = '<div class="text-yellow-500 mb-2 font-bold animate-pulse">Connecting to backend engine...</div>';
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            
+            const wsUrl = new URL(`${protocol}//${window.location.host}/ws/rclone/config/${encodeURIComponent(name)}`);
+            if (client_id) wsUrl.searchParams.append('client_id', client_id);
+            if (client_secret) wsUrl.searchParams.append('client_secret', client_secret);
+            
+            rcloneWs = new WebSocket(wsUrl.toString());
+            
+            rcloneWs.onmessage = e => { 
+                term.insertAdjacentHTML('beforeend', e.data); 
+                term.scrollTop = term.scrollHeight; 
+            };
+        }
+
+        // --- DYNAMIC SOURCE FIELD INJECTION ---
+        function addSourceField(modId, value = '') {
+            const list = document.getElementById(`${modId}_source_list`);
+            const rowId = 'src_' + Math.random().toString(36).substr(2, 9);
+            const div = document.createElement('div');
+            div.className = "flex space-x-2";
+            div.innerHTML = `
+                <input type="text" id="${rowId}" class="input-field req-module multi-source-input" value="${escapeHTML(value)}" placeholder="E.g., D:\\MyFolder or C:\\file.txt">
+                <button type="button" onclick="openBrowser('${rowId}')" class="browse-btn" title="Browse Server">📁</button>
+                <button type="button" onclick="this.parentElement.remove()" class="bg-red-900/50 hover:bg-red-500 border border-red-900 text-white px-3 py-2 rounded transition" title="Remove Path">✖</button>
+            `;
+            list.appendChild(div);
+        }
+
+        // --- DYNAMIC EXCLUSION FIELD INJECTION ---
+        function addExcludeField(modId, type = 'file', value = '') {
+            const list = document.getElementById(`${modId}_exclude_list`);
+            const div = document.createElement('div');
+            div.className = "flex space-x-2 exclude-row";
+            div.innerHTML = `
+                <select class="input-field w-1/3 exclude-type">
+                    <option value="file" ${type === 'file' ? 'selected' : ''}>File Match</option>
+                    <option value="folder" ${type === 'folder' ? 'selected' : ''}>Folder Match</option>
+                </select>
+                <input type="text" class="input-field w-2/3 exclude-val" value="${escapeHTML(value)}" placeholder="E.g., *.tmp or node_modules">
+                <button type="button" onclick="this.parentElement.remove()" class="bg-red-900/50 hover:bg-red-500 border border-red-900 text-white px-3 py-2 rounded transition" title="Remove Exclusion">✖</button>
+            `;
+            list.appendChild(div);
+        }
+
+        // --- DUPLICATE MODULE ---
+        function duplicateModule(sourceModId) {
+            const type = document.getElementById(`${sourceModId}_type`).value;
+            
+            let finalSource;
+            if (type === 'folder_archive') {
+                finalSource = [];
+                document.getElementById(`${sourceModId}_source_list`).querySelectorAll('.multi-source-input').forEach(inp => {
+                    if(inp.value.trim() !== '') finalSource.push(inp.value.trim());
+                });
+            } else {
+                finalSource = document.getElementById(`${sourceModId}_source_single`).value;
+            }
+
+            const finalExcludes = [];
+            document.getElementById(`${sourceModId}_exclude_list`).querySelectorAll('.exclude-row').forEach(row => {
+                const type = row.querySelector('.exclude-type').value;
+                const val = row.querySelector('.exclude-val').value.trim();
+                if(val !== '') finalExcludes.push({ type: type, value: val });
+            });
+
+            const clonedData = {
+                name: "Copy of " + document.getElementById(`${sourceModId}_name`).value,
+                enabled: document.getElementById(`${sourceModId}_toggle`).checked,
+                type: type,
+                source: finalSource,
+                dest: document.getElementById(`${sourceModId}_dest`).value,
+                schedule_cron: buildCronFromUI(sourceModId),
+                exclude: finalExcludes,
+                nas_user: document.getElementById(`${sourceModId}_nas_user`) ? document.getElementById(`${sourceModId}_nas_user`).value : '',
+                nas_pass: document.getElementById(`${sourceModId}_nas_pass`) ? document.getElementById(`${sourceModId}_nas_pass`).value : '',
+                max_backups: document.getElementById(`${sourceModId}_max_backups`) ? parseInt(document.getElementById(`${sourceModId}_max_backups`).value) || 0 : 0
+            };
+
+            addCustomModule(clonedData, true);
+            
+            const status = document.getElementById('save-status');
+            status.textContent = "Module Duplicated (Unsaved)";
+            status.className = "text-xs font-bold text-blue-400 mr-4 animate-pulse";
+            setTimeout(() => { status.textContent = ""; }, 4000);
+        }
+
+        // --- CUSTOM MODULE GENERATOR ---
+        function addCustomModule(data = null, autoScroll = false) {
+            const container = document.getElementById('custom-modules-container');
+            const modId = data && data.id ? data.id : 'job_' + Math.random().toString(36).substr(2, 9);
+            
+            let sourceString = "";
+            let sourceArray = [];
+            if (data && data.source) {
+                if (Array.isArray(data.source)) {
+                    sourceString = data.source[0] || '';
+                    sourceArray = data.source;
+                } else {
+                    sourceString = data.source;
+                    sourceArray = [data.source];
+                }
+            }
+
+            const excludes = data && data.exclude ? data.exclude : [];
+
+            const div = document.createElement('div');
+            div.className = "card custom-module-card border-purple-900/50 relative transition-all duration-700 ease-out";
+            div.dataset.modId = modId;
+            
+            div.innerHTML = `
+                <div class="card-header bg-gray-900 flex justify-between items-center pr-4">
+                    <input type="text" id="${modId}_name" class="bg-transparent border-b border-gray-600 focus:border-purple-400 outline-none text-lg font-bold text-purple-400 w-1/2 px-2 py-1" placeholder="My Backup Job" value="${escapeHTML(data ? data.name : 'New Backup Job')}">
+                    
+                    <div class="flex items-center space-x-6">
+                        <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" id="${modId}_toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" ${(!data || data.enabled !== false) ? 'checked' : ''} onchange="toggleModule('${modId}')"/>
+                            <label for="${modId}_toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-500 cursor-pointer"></label>
+                        </div>
+                        <button onclick="duplicateModule('${modId}')" class="text-blue-400 hover:text-blue-300 font-bold transition" title="Clone this module">📋 Duplicate</button>
+                        <button onclick="this.closest('.custom-module-card').remove()" class="text-red-500 hover:text-red-400 font-bold transition">🗑️ Delete</button>
+                    </div>
+                </div>
+                <div id="mod_body_${modId}" class="card-body">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div>
+                            <label class="label-text">Module Type</label>
+                            <select id="${modId}_type" class="input-field text-purple-300 font-bold border-purple-900/50" onchange="updateCustomModUI('${modId}')">
+                                <option value="backup_duplication" ${(data && data.type === 'backup_duplication') ? 'selected' : ''}>Backup Duplication (Local/NAS Sync)</option>
+                                <option value="cloud_push" ${(data && data.type === 'cloud_push') ? 'selected' : ''}>Cloud Storage Push (To Google Drive)</option>
+                                <option value="cloud_pull" ${(data && data.type === 'cloud_pull') ? 'selected' : ''}>Cloud Storage Pull (From Google Drive)</option>
+                                <option value="folder_archive" ${(data && data.type === 'folder_archive') ? 'selected' : ''}>Folder-Specific (Multi Zip Archive)</option>
+                                <option value="infrastructure_copy" ${(data && data.type === 'infrastructure_copy') ? 'selected' : ''}>Infrastructure (App Directory Copy)</option>
+                            </select>
+                        </div>
+                        
+                        <div id="${modId}_source_single_div" class="hidden col-span-2">
+                            <label id="${modId}_source_label" class="label-text">Source Path <span class="text-red-500">*</span></label>
+                            <div class="flex space-x-2">
+                                <input type="text" id="${modId}_source_single" class="input-field req-module" value="${escapeHTML(sourceString)}">
+                                <button type="button" onclick="openBrowser('${modId}_source_single')" class="browse-btn">📁</button>
+                            </div>
+                        </div>
+                        
+                        <div id="${modId}_dest_container">
+                            <label id="${modId}_dest_label" class="label-text">Destination Path <span class="text-red-500">*</span></label>
+                            <div class="flex space-x-2">
+                                <input type="text" id="${modId}_dest" class="input-field req-module" value="${escapeHTML(data ? data.dest : '')}">
+                                <button type="button" onclick="openBrowser('${modId}_dest')" class="browse-btn" id="${modId}_dest_btn">📁</button>
+                            </div>
+                        </div>
+
+                        <div id="${modId}_archive_retention_div" class="hidden">
+                            <label class="label-text">Max Backups Kept (0 = Keep All)</label>
+                            <input type="number" id="${modId}_max_backups" class="input-field" value="${data && data.max_backups !== undefined ? data.max_backups : 0}" min="0">
+                        </div>
+                    </div>
+
+                    <div id="${modId}_source_multi_div" class="hidden mb-4 bg-black/20 p-4 rounded border border-gray-700">
+                        <label class="label-text text-cyan-400 mb-3 border-b border-gray-700 pb-1">Archive Target Sources <span class="text-red-500">*</span></label>
+                        <div id="${modId}_source_list" class="space-y-2 mb-3">
+                            </div>
+                        <button type="button" onclick="addSourceField('${modId}')" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-xs text-white px-3 py-1.5 rounded transition shadow-sm">+ Add Another Target</button>
+                    </div>
+
+                    <div id="${modId}_nas_auth" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 hidden bg-black/30 p-3 rounded border border-gray-700">
+                        <div>
+                            <label class="label-text text-yellow-500">NAS Username (Optional)</label>
+                            <input type="text" id="${modId}_nas_user" class="input-field" placeholder="Admin" value="${escapeHTML(data && data.nas_user ? data.nas_user : '')}">
+                        </div>
+                        <div>
+                            <label class="label-text text-yellow-500">NAS Password (Optional)</label>
+                            <input type="password" id="${modId}_nas_pass" class="input-field" placeholder="••••••" value="${escapeHTML(data && data.nas_pass ? data.nas_pass : '')}">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="label-text">Schedule</label>
+                            <select id="${modId}_freq" class="input-field" onchange="toggleCronUI('${modId}')">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="hourly">Hourly</option>
+                                <option value="custom">Advanced (Cron)</option>
+                                <option value="disabled">Disabled / Manual Only</option>
+                            </select>
+                        </div>
+                        <div id="${modId}_day_container" class="hidden">
+                            <label class="label-text">Day of Week</label>
+                            <select id="${modId}_day" class="input-field">
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                                <option value="0">Sunday</option>
+                            </select>
+                        </div>
+                        <div id="${modId}_param_container">
+                            <label id="${modId}_param_label" class="label-text">Execution Time</label>
+                            <input type="time" id="${modId}_time" class="input-field">
+                            <input type="text" id="${modId}_cron" class="input-field hidden">
+                        </div>
+                    </div>
+
+                    <div id="${modId}_exclude_div" class="hidden col-span-1 md:col-span-3 mb-4 bg-black/20 p-4 rounded border border-gray-700">
+                        <label class="label-text text-cyan-400 mb-3 border-b border-gray-700 pb-1">Exclusions (Optional)</label>
+                        <div id="${modId}_exclude_list" class="space-y-2 mb-3">
+                            </div>
+                        <button type="button" onclick="addExcludeField('${modId}')" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-xs text-white px-3 py-1.5 rounded transition shadow-sm">+ Add Exclusion</button>
+                    </div>
+
+                </div>
+            `;
+            container.appendChild(div);
+            
+            if (sourceArray.length > 0) { sourceArray.forEach(src => addSourceField(modId, src)); } 
+            else { addSourceField(modId, ''); }
+
+            if (excludes.length > 0) {
+                excludes.forEach(ex => {
+                    if (typeof ex === 'object') {
+                        addExcludeField(modId, ex.type, ex.value);
+                    } else {
+                        let t = 'file';
+                        let v = ex;
+                        if (v.endsWith('/**')) {
+                            t = 'folder';
+                            v = v.substring(0, v.length - 3);
+                        }
+                        addExcludeField(modId, t, v);
+                    }
+                });
+            }
+
+            if (data && data.schedule_cron) { parseCronToUI(modId, data.schedule_cron); } 
+            else { parseCronToUI(modId, ""); }
+            
+            updateCustomModUI(modId);
+            toggleModule(modId);
+
+            if (autoScroll) {
+                setTimeout(() => {
+                    div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    div.classList.add('border-green-500', 'shadow-[0_0_20px_rgba(34,197,94,0.4)]');
+                    
+                    const nameInput = document.getElementById(`${modId}_name`);
+                    if(nameInput) nameInput.focus();
+
+                    setTimeout(() => {
+                        div.classList.remove('border-green-500', 'shadow-[0_0_20px_rgba(34,197,94,0.4)]');
+                    }, 1500);
+                }, 100);
+            }
+        }
+
+        function updateCustomModUI(modId) {
+            const type = document.getElementById(`${modId}_type`).value;
+            const excludeDiv = document.getElementById(`${modId}_exclude_div`);
+            const nasAuthDiv = document.getElementById(`${modId}_nas_auth`);
+            const sourceLabel = document.getElementById(`${modId}_source_label`);
+            const destLabel = document.getElementById(`${modId}_dest_label`);
+            
+            const singleSourceDiv = document.getElementById(`${modId}_source_single_div`);
+            const multiSourceDiv = document.getElementById(`${modId}_source_multi_div`);
+            const destBtn = document.getElementById(`${modId}_dest_btn`);
+            const archiveRetentionDiv = document.getElementById(`${modId}_archive_retention_div`);
+            const singleSourceInput = document.getElementById(`${modId}_source_single`);
+
+            if (type === 'backup_duplication') {
+                sourceLabel.innerHTML = 'Local Source Path <span class="text-red-500">*</span>';
+                destLabel.innerHTML = 'NAS Share Path (SMB) <span class="text-red-500">*</span>';
+                destBtn.classList.remove('hidden');
+                archiveRetentionDiv.classList.add('hidden');
+            } else if (type === 'cloud_push') {
+                sourceLabel.innerHTML = 'Local Source Path <span class="text-red-500">*</span>';
+                destLabel.innerHTML = 'Cloud Remote (e.g., gdrive_backup:) <span class="text-red-500">*</span>';
+                destBtn.classList.remove('hidden'); 
+                archiveRetentionDiv.classList.add('hidden');
+            } else if (type === 'cloud_pull') {
+                sourceLabel.innerHTML = 'Cloud Remote (e.g., gdrive_backup:Photos) <span class="text-red-500">*</span>';
+                destLabel.innerHTML = 'Local Destination Path <span class="text-red-500">*</span>';
+                destBtn.classList.remove('hidden');
+                archiveRetentionDiv.classList.add('hidden');
+            } else if (type === 'folder_archive') {
+                destLabel.innerHTML = 'Zip Output Directory <span class="text-red-500">*</span>';
+                destBtn.classList.remove('hidden');
+                archiveRetentionDiv.classList.remove('hidden');
+            } else if (type === 'infrastructure_copy') {
+                sourceLabel.innerHTML = 'App Directory (Blank for Auto)';
+                destLabel.innerHTML = 'Backup Output Directory <span class="text-red-500">*</span>';
+                destBtn.classList.remove('hidden');
+                archiveRetentionDiv.classList.add('hidden');
+            }
+
+            if (type === 'infrastructure_copy') {
+                if (singleSourceInput) {
+                    singleSourceInput.classList.remove('req-module');
+                    singleSourceInput.classList.remove('border-red-500'); 
+                }
+            } else {
+                if (singleSourceInput) {
+                    singleSourceInput.classList.add('req-module');
+                }
+            }
+
+            if (type === 'folder_archive') {
+                singleSourceDiv.classList.add('hidden');
+                multiSourceDiv.classList.remove('hidden');
+            } else {
+                singleSourceDiv.classList.remove('hidden');
+                multiSourceDiv.classList.add('hidden');
+            }
+
+            if (['backup_duplication', 'cloud_push', 'cloud_pull', 'folder_archive'].includes(type)) { 
+                excludeDiv.classList.remove('hidden'); 
+            } else { 
+                excludeDiv.classList.add('hidden'); 
+            }
+
+            if (type === 'backup_duplication') { nasAuthDiv.classList.remove('hidden'); } 
+            else { nasAuthDiv.classList.add('hidden'); }
+        }
+
+        // --- FILE BROWSER LOGIC ---
+        let currentBrowserInputId = null;
+        let currentBrowserPath = "";
+        let currentParentPath = "";
+
+        function openBrowser(inputId) {
+            currentBrowserInputId = inputId;
+            const el = document.getElementById(inputId);
+            let pathToFetch = el.tagName === 'TEXTAREA' ? '' : el.value; 
+
+            if (!pathToFetch) {
+                const card = el.closest('.custom-module-card');
+                if (card) {
+                    const type = card.querySelector('select[id$="_type"]').value;
+                    if ((inputId.includes('dest') && type === 'cloud_push') ||
+                        (inputId.includes('source') && type === 'cloud_pull')) {
+                        pathToFetch = 'cloud://';
+                    } else {
+                        pathToFetch = '';
+                    }
+                } else {
+                    pathToFetch = '';
+                }
+            } else {
+                if (pathToFetch.length === 2 && pathToFetch[1] === ':') {
+                    pathToFetch = pathToFetch + '\\';
+                }
+            }
+            
+            document.getElementById('browser-modal').classList.remove('hidden');
+            fetchBrowse(pathToFetch);
+        }
+
+        function closeBrowser() {
+            document.getElementById('browser-modal').classList.add('hidden');
+            currentBrowserInputId = null;
+        }
+
+        async function fetchBrowse(path) {
+            const listDiv = document.getElementById('browser-list');
+            listDiv.innerHTML = '<div class="text-center text-cyan-500 py-10 font-bold animate-pulse">Scanning Directory...</div>';
+            try {
+                const res = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await res.json();
+                
+                if (!data.success) {
+                    listDiv.innerHTML = `<div class="text-center text-red-500 font-bold py-10 bg-red-900/20 rounded border border-red-900/50 m-4">${escapeHTML(data.error)}</div>`;
+                    return;
+                }
+                
+                currentBrowserPath = data.path;
+                currentParentPath = data.parent;
+                document.getElementById('browser-path-input').value = data.path;
+                listDiv.innerHTML = '';
+                
+                if (data.items.length === 0) {
+                    listDiv.innerHTML = '<div class="text-center text-gray-500 py-10 italic">This directory is empty.</div>';
+                    return;
+                }
+                
+                data.items.forEach(item => {
+                    const isDir = item.type === 'dir';
+                    
+                    const opacityClass = item.hidden ? 'opacity-50' : 'opacity-100';
+                    const hiddenBadge = item.hidden ? '<span class="text-[9px] bg-gray-700 text-gray-400 px-1 rounded ml-2 uppercase tracking-wider font-bold">Hidden</span>' : '';
+
+                    const safeName = escapeHTML(item.name);
+
+                    const div = document.createElement('div');
+                    div.className = `flex items-center space-x-3 p-2.5 rounded hover:bg-gray-800 border border-transparent hover:border-gray-700 cursor-pointer text-sm text-gray-300 transition group ${opacityClass}`;
+                    div.innerHTML = `<span class="text-xl opacity-80 group-hover:opacity-100 grayscale-[0.2]">${isDir ? '📁' : '📄'}</span><span class="flex-grow truncate ${isDir ? 'font-bold text-cyan-300' : ''}">${safeName}${hiddenBadge}</span>`;
+                    
+                    div.onclick = () => {
+                        if (isDir) { fetchBrowse(item.path); } 
+                        else {
+                            if(currentBrowserInputId) {
+                                const el = document.getElementById(currentBrowserInputId);
+                                if (el.tagName === 'TEXTAREA') {
+                                    el.value = el.value ? el.value + '\n' + item.path : item.path;
+                                } else {
+                                    el.value = item.path;
+                                }
+                            }
+                            closeBrowser();
+                        }
+                    };
+                    listDiv.appendChild(div);
+                });
+            } catch (err) { listDiv.innerHTML = `<div class="text-center text-red-500 py-10 font-bold">Network Communication Error</div>`; }
+        }
+
+        function navigateUp() { if (currentBrowserPath !== "") fetchBrowse(currentParentPath); }
+
+        function selectCurrentFolder() {
+            if(currentBrowserInputId && currentBrowserPath) {
+                const el = document.getElementById(currentBrowserInputId);
+                if (el.tagName === 'TEXTAREA') {
+                    el.value = el.value ? el.value + '\n' + currentBrowserPath : currentBrowserPath;
+                } else {
+                    el.value = currentBrowserPath;
+                }
+            }
+            closeBrowser();
+        }
+
+        // --- SCHEDULER TRANSLATION LOGIC ---
+        function toggleCronUI(prefix) {
+            const freq = document.getElementById(`${prefix}_freq`).value;
+            const paramCont = document.getElementById(`${prefix}_param_container`);
+            const paramLabel = document.getElementById(`${prefix}_param_label`);
+            const timeInput = document.getElementById(`${prefix}_time`);
+            const cronInput = document.getElementById(`${prefix}_cron`);
+            const dayCont = document.getElementById(`${prefix}_day_container`);
+
+            if (freq === 'disabled' || freq === 'hourly') {
+                paramCont.classList.add('hidden');
+                dayCont.classList.add('hidden');
+            } else {
+                paramCont.classList.remove('hidden');
+                if (freq === 'daily') {
+                    paramLabel.textContent = "Execution Time";
+                    timeInput.classList.remove('hidden');
+                    cronInput.classList.add('hidden');
+                    dayCont.classList.add('hidden');
+                } else if (freq === 'weekly') {
+                    paramLabel.textContent = "Execution Time";
+                    timeInput.classList.remove('hidden');
+                    cronInput.classList.add('hidden');
+                    dayCont.classList.remove('hidden');
+                } else if (freq === 'custom') {
+                    paramLabel.textContent = "Cron Expression";
+                    timeInput.classList.add('hidden');
+                    cronInput.classList.remove('hidden');
+                    dayCont.classList.add('hidden');
+                }
+            }
+        }
+
+        function parseCronToUI(prefix, cronString) {
+            const freqEl = document.getElementById(`${prefix}_freq`);
+            const timeEl = document.getElementById(`${prefix}_time`);
+            const cronEl = document.getElementById(`${prefix}_cron`);
+            const dayEl = document.getElementById(`${prefix}_day`);
+
+            if (!cronString || cronString.trim() === "") { 
+                freqEl.value = "disabled"; 
+            } else if (cronString.trim() === "0 * * * *") { 
+                freqEl.value = "hourly"; 
+            } else {
+                const parts = cronString.trim().split(/\s+/);
+                if (parts.length === 5 && parts[2] === '*' && parts[3] === '*' && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    if (parts[4] === '*') {
+                        freqEl.value = "daily";
+                        timeEl.value = `${parts[1].padStart(2, '0')}:${parts[0].padStart(2, '0')}`;
+                    } else if (!isNaN(parts[4])) {
+                        freqEl.value = "weekly";
+                        timeEl.value = `${parts[1].padStart(2, '0')}:${parts[0].padStart(2, '0')}`;
+                        dayEl.value = parts[4];
+                    } else {
+                        freqEl.value = "custom";
+                        cronEl.value = cronString;
+                    }
+                } else {
+                    freqEl.value = "custom";
+                    cronEl.value = cronString;
+                }
+            }
+            toggleCronUI(prefix);
+        }
+
+        function buildCronFromUI(prefix) {
+            const freq = document.getElementById(`${prefix}_freq`).value;
+            if (freq === "disabled") return "";
+            if (freq === "hourly") return "0 * * * *";
+            if (freq === "custom") return document.getElementById(`${prefix}_cron`).value;
+            
+            let timeVal = document.getElementById(`${prefix}_time`).value;
+            if (!timeVal) timeVal = "00:00"; 
+            const parts = timeVal.split(':');
+            const h = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+
+            if (freq === "daily") {
+                return `${m} ${h} * * *`;
+            } else if (freq === "weekly") {
+                const d = document.getElementById(`${prefix}_day`).value;
+                return `${m} ${h} * * ${d}`;
+            }
+            return "";
+        }
+
+        function toggleModule(modId) {
+            const isEnabled = document.getElementById(`${modId}_toggle`).checked;
+            const body = document.getElementById(`mod_body_${modId}`);
+            if (isEnabled) {
+                body.style.maxHeight = body.scrollHeight + 500 + "px"; 
+                body.style.opacity = "1";
+                setTimeout(() => body.style.overflow = "visible", 500);
+            } else {
+                body.style.overflow = "hidden";
+                body.style.maxHeight = "0px";
+                body.style.opacity = "0.3";
+            }
+        }
+
+        // --- DATA LOAD ---
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const c = await response.json();
+                
+                document.getElementById('app_host').value = c.app?.host || '';
+                document.getElementById('app_port').value = c.app?.port || 8050;
+                document.getElementById('app_log_level').value = c.app?.log_level || 'INFO';
+                document.getElementById('app_log_retention').value = c.app?.log_retention_days || 7;
+                
+                document.getElementById('path_rclone_config').value = c.paths?.rclone_config || '';
+                document.getElementById('path_rclone_exe').value = c.paths?.rclone_exe || '';
+                
+                document.getElementById('notif_discord').value = c.notifications?.discord_webhook_url || '';
+
+                if (c.security?.auth_enabled) {
+                    document.getElementById('logout_btn').style.display = 'inline-block';
+                }
+                document.getElementById('sec_auth_enabled').checked = c.security?.auth_enabled || false;
+                document.getElementById('sec_username').value = c.security?.username || 'admin';
+                document.getElementById('sec_password').value = c.security?.password || '';
+                document.getElementById('sec_trusted_proxies').value = c.security?.trusted_proxies || '';
+                document.getElementById('sec_max_strikes').value = c.security?.max_login_strikes || 5;
+                document.getElementById('sec_lockout_minutes').value = c.security?.lockout_duration_minutes || 15;
+                
+                toggleSecurityUI();
+
+                if (c.jobs) {
+                    for (const [jobId, jobData] of Object.entries(c.jobs)) {
+                        jobData.id = jobId;
+                        addCustomModule(jobData);
+                    }
+                }
+                
+                loadRemotes(); 
+            } catch (err) { console.error("Failed to load config from API", err); }
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadConfig);
+
+        function getLinesAsArray(elementId) {
+            return document.getElementById(elementId).value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+        // --- VALIDATION AND SAVE ---
+        async function saveConfig() {
+            const status = document.getElementById('save-status');
+            let validationFailed = false;
+            
+            document.querySelectorAll('.req-global').forEach(el => {
+                if(!el.value.trim()) { el.classList.add('border-red-500'); validationFailed = true; }
+                else { el.classList.remove('border-red-500'); }
+            });
+
+            document.querySelectorAll('.custom-module-card').forEach(card => {
+                const id = card.dataset.modId;
+                const isEnabled = document.getElementById(`${id}_toggle`).checked;
+                
+                card.querySelectorAll('.req-module').forEach(el => {
+                    if (el.closest('.hidden')) {
+                        el.classList.remove('border-red-500');
+                        return;
+                    }
+                    if(isEnabled && !el.value.trim()) { el.classList.add('border-red-500'); validationFailed = true; }
+                    else { el.classList.remove('border-red-500'); }
+                });
+            });
+
+            const authEnabled = document.getElementById('sec_auth_enabled').checked;
+            const secUser = document.getElementById('sec_username');
+            const secPass = document.getElementById('sec_password');
+            if (authEnabled) {
+                if (!secUser.value.trim()) { secUser.classList.add('border-red-500'); validationFailed = true; }
+                secPass.classList.remove('border-red-500'); 
+            } else {
+                secUser.classList.remove('border-red-500');
+                secPass.classList.remove('border-red-500');
+            }
+
+            if (validationFailed) {
+                status.textContent = "✖ MISSING REQUIRED FIELDS";
+                status.className = "text-xs font-bold text-red-500 mr-4 animate-pulse";
+                return;
+            }
+
+            const jobs = {};
+            document.querySelectorAll('.custom-module-card').forEach(card => {
+                const id = card.dataset.modId;
+                const type = document.getElementById(`${id}_type`).value;
+                
+                let finalSource;
+                if (type === 'folder_archive') {
+                    finalSource = [];
+                    document.getElementById(`${id}_source_list`).querySelectorAll('.multi-source-input').forEach(inp => {
+                        if(inp.value.trim() !== '') finalSource.push(inp.value.trim());
+                    });
+                } else {
+                    finalSource = document.getElementById(`${id}_source_single`).value;
+                }
+
+                const finalExcludes = [];
+                document.getElementById(`${id}_exclude_list`).querySelectorAll('.exclude-row').forEach(row => {
+                    const exType = row.querySelector('.exclude-type').value;
+                    const exVal = row.querySelector('.exclude-val').value.trim();
+                    if(exVal !== '') {
+                        finalExcludes.push({ type: exType, value: exVal });
+                    }
+                });
+                
+                jobs[id] = {
+                    name: document.getElementById(`${id}_name`).value,
+                    enabled: document.getElementById(`${id}_toggle`).checked,
+                    type: type,
+                    source: finalSource,
+                    dest: document.getElementById(`${id}_dest`).value,
+                    schedule_cron: buildCronFromUI(id),
+                    exclude: finalExcludes,
+                    nas_user: document.getElementById(`${id}_nas_user`) ? document.getElementById(`${id}_nas_user`).value : '',
+                    nas_pass: document.getElementById(`${id}_nas_pass`) ? document.getElementById(`${id}_nas_pass`).value : '',
+                    max_backups: document.getElementById(`${id}_max_backups`) ? parseInt(document.getElementById(`${id}_max_backups`).value) || 0 : 0
+                };
+            });
+
+            const payload = {
+                app: {
+                    port: parseInt(document.getElementById('app_port').value),
+                    host: document.getElementById('app_host').value,
+                    log_level: document.getElementById('app_log_level').value,
+                    log_retention_days: parseInt(document.getElementById('app_log_retention').value)
+                },
+                security: {
+                    auth_enabled: document.getElementById('sec_auth_enabled').checked,
+                    username: document.getElementById('sec_username').value.trim() || 'admin',
+                    password: document.getElementById('sec_password').value.trim() || '',
+                    trusted_proxies: document.getElementById('sec_trusted_proxies').value.trim(),
+                    max_login_strikes: parseInt(document.getElementById('sec_max_strikes').value) || 5,
+                    lockout_duration_minutes: parseInt(document.getElementById('sec_lockout_minutes').value) || 15
+                },
+                paths: {
+                    rclone_exe: document.getElementById('path_rclone_exe').value,
+                    rclone_config: document.getElementById('path_rclone_config').value
+                },
+                jobs: jobs,
+                notifications: {
+                    discord_webhook_url: document.getElementById('notif_discord').value
+                }
+            };
+
+            status.textContent = "Saving...";
+            status.className = "text-xs font-bold text-yellow-500 mr-4";
+
+            try {
+                const response = await fetch('/api/config/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    status.textContent = "✓ SETTINGS SAVED";
+                    status.className = "text-xs font-bold text-green-500 mr-4";
+                    
+                    if (payload.security.auth_enabled) {
+                        document.getElementById('logout_btn').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('logout_btn').style.display = 'none';
+                    }
+                    
+                    setTimeout(() => { status.textContent = ""; }, 3000);
+                } else {
+                    status.textContent = "✖ SAVE FAILED";
+                    status.className = "text-xs font-bold text-red-500 mr-4";
+                    alert("Backend Error:\n" + result.error);
+                }
+            } catch (err) {
+                status.textContent = "✖ CONNECTION ERROR";
+                status.className = "text-xs font-bold text-red-500 mr-4";
+            }
+        }
+    </script>
+</body>
+</html>
