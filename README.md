@@ -1,4 +1,4 @@
-# BetterBackups (v1.0.0)
+# BetterBackups (v1.0.1)
 
 BetterBackups is a highly secure, self-hosted, web-based backup engine for Windows. It provides a beautiful GUI to manage local file archiving, NAS syncing, and Cloud Storage pushes/pulls (Google Drive) using the sheer power of Rclone.
 
